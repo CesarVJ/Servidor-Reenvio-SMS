@@ -8,7 +8,10 @@ import android.telephony.SmsManager;
 import android.telephony.SmsMessage;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 
 public class ServidorSMS extends BroadcastReceiver {
 
@@ -38,10 +41,6 @@ public class ServidorSMS extends BroadcastReceiver {
             System.out.println("MENSAJE: "+cuerpoMensaje);
 
             analizarMensaje(cuerpoMensaje, telefono, context);
-            //reenviaSMS(telefono, "Mensaje recibido");
-
-            //TextView miTextView = new TextView(context.getApplicationContext());
-            //miTextView.setText(informacion);
         }
     }
 
@@ -59,6 +58,19 @@ public class ServidorSMS extends BroadcastReceiver {
                 fecha = datos[0].substring(0,5);
                 servicio = datos[1].trim().toLowerCase();
                 obtenerDatos(servicio, telefono, fecha,context);
+            }else if(datos.length==1){
+                // Solo se proporciono el tipo de servicio, por lo que se muestra el Horoscopo/Calendario la fecha actual
+                Date c = Calendar.getInstance().getTime();
+                System.out.println("Current time => " + c);
+
+                SimpleDateFormat df = new SimpleDateFormat("dd-MM-yy");
+                String formattedDate = df.format(c);
+
+                fecha = formattedDate.substring(0,5).replace('-','/');
+                System.out.println("FECHA;"+fecha);
+
+                servicio = datos[0].trim().toLowerCase();
+                obtenerDatos(servicio, telefono, fecha,context);
             }
         }
 
@@ -69,26 +81,47 @@ public class ServidorSMS extends BroadcastReceiver {
         databaseHandler.getReadableDatabase();
         String respuestaSMS = null;
         String[] result = null;
+        String[] result2 = null;
+
         System.out.println(servicio+" ES EL SERVICIOOO");
         if(servicio.equalsIgnoreCase("horóscopo") || servicio.equalsIgnoreCase("horoscopo")){
             result = databaseHandler.getZodiaco(fecha);
 
         }else if(servicio.equalsIgnoreCase("calendario")){
             result = databaseHandler.getCalendario(fecha);
-        }else{
-
+        }else if(servicio.equalsIgnoreCase("ambos")){
+            result = databaseHandler.getCalendario(fecha);
+            result2 = databaseHandler.getZodiaco(fecha);
         }
-        if(result!=null) {
-            String infoSimbolo = "Simbolo: "+result[0]+"\n";
-            String diosProtector = "Dios protector: "+result[1]+"\n";
-            String infAdicional = "Extra: "+result[2]+"\n";
-
-            respuestaSMS = servicio.toUpperCase()+"\n"+infoSimbolo+diosProtector+infAdicional;
+        if(result!=null && result2==null) {
+            respuestaSMS = armarMensajeRespuesta(servicio, result);
             reenviaSMS(telefono,respuestaSMS);
-            //reenviaSMS(telefono,infAdicional);
-            System.out.println("=========="+result[0]+"======="+result[1]+"=============="+result[2]+"===================");
+        }else if(result!=null && result2!=null){
+            respuestaSMS = armarMensajeRespuesta("calendario", result);
+            reenviaSMS(telefono,respuestaSMS);
+
+            respuestaSMS = armarMensajeRespuesta("horoscopo", result2);
+            reenviaSMS(telefono,respuestaSMS);
         }
 }
+
+    private String armarMensajeRespuesta(String servicio, String[] result){
+        String infoSimbolo = "Simbolo: "+result[0]+"\n";
+        String diosProtector;
+        String infAdicional;
+        String respuestaSMS = null;
+
+        if(servicio.equalsIgnoreCase("calendario")){
+            diosProtector = "Dios protector: "+result[1]+"\n";
+            infAdicional = "Extra: "+result[2]+"\n";
+        }else{
+            diosProtector = "Divinidad: "+result[2]+"\n";
+            infAdicional = "Extra (Planeta): "+result[1]+"\n";
+        }
+
+        respuestaSMS = servicio.toUpperCase()+"\n"+infoSimbolo+diosProtector+infAdicional;
+        return respuestaSMS;
+    }
 
     private void reenviaSMS(String telefono, String mensaje){
         SmsManager smsManager= SmsManager.getDefault();
